@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+
+<div class="card shadow p-4 mx-auto" style="max-width:500px;">
+    <h4 class="mb-3 text-center">Scan Student Parcel QR</h4>
+
+    <div id="reader" style="width:100%;"></div>
+
+    <!-- Auto submit form when QR is scanned -->
+    <form method="POST" id="qrForm">
+        <input type="hidden" name="qr_code" id="qr_code">
+    </form>
+
+    <hr>
+
+    <!-- Manual backup input -->
+    <form method="POST">
+        <input type="text"
+               class="form-control mb-2"
+               name="qr_code"
+               placeholder="Paste QR Code Data"
+               required>
+
+        <button type="submit" class="btn btn-primary w-100">
+            Search Parcel
+        </button>
+    </form>
+</div>
+
+<script>
+function onScanSuccess(decodedText) {
+    document.getElementById("qr_code").value = decodedText;
+    document.getElementById("qrForm").submit();
+}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+    if (devices && devices.length) {
+
+        let cameraId;
+
+        const backCamera = devices.find(device =>
+            device.label.toLowerCase().includes("back") ||
+            device.label.toLowerCase().includes("rear") ||
+            device.label.toLowerCase().includes("environment")
+        );
+
+        if (backCamera) {
+            cameraId = backCamera.id;
+        } else {
+            cameraId = devices[0].id;
+        }
+
+        html5QrCode.start(
+            cameraId,
+            {
+                fps: 10,
+                qrbox: { width: 250, height: 250 }
+            },
+            onScanSuccess
+        ).catch(err => {
+            console.log("Start camera error:", err);
+            alert("Camera cannot start. Please allow camera permission.");
+        });
+
+    } else {
+        alert("No camera found. Please use manual QR input.");
+    }
+}).catch(err => {
+    console.log("Camera permission error:", err);
+    alert("Camera cannot open. Please allow camera permission or use manual QR input.");
+});
+</script>
+
+{% endblock %}

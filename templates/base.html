@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parcel Collection</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/dashboard-modern.css') }}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
+          rel="stylesheet">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="flash-message">
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+
+{% if request.endpoint in [
+    'login',
+    'register',
+    'forgot_password',
+    'verify_reset_code',
+    'reset_password',
+    'dashboard',
+    'payment_method',
+    'payment_success',
+    'notices',
+    'qr_page',
+    'profile'
+] %}
+<video autoplay muted loop playsinline class="student-video-bg">
+    <source src="{{ url_for('static', filename='video/background_student.mp4') }}" type="video/mp4">
+</video>
+<div class="student-video-overlay"></div>
+{% endif %}
+
+    {% block content %}{% endblock %}
+
+    <!-- Student Chat Only -->
+    {% if request.endpoint in [
+        'dashboard',
+        'payment_method',
+        'payment_success',
+        'notices',
+        'profile',
+        'qr_page'
+    ] %}
+
+    <div id="parcel-chat-widget">
+
+        <button id="parcel-chat-toggle" class="chat-toggle" type="button">
+            💬 Chat
+        </button>
+
+        <div id="parcel-chat-window" class="chat-box">
+
+            <div class="chat-header">
+                <span>Parcel Assistant</span>
+                <button id="parcel-chat-close" type="button">×</button>
+            </div>
+
+            <div id="parcel-chat-messages" class="chat-messages">
+                <div class="chat-message bot">
+                    Hello 👋 How can I help you today?
+                </div>
+            </div>
+
+            <div class="quick-questions">
+                <button class="quick-chat"
+                        type="button"
+                        data-message="Where is my parcel?">
+                    📦 Track Parcel
+                </button>
+
+                <button class="quick-chat"
+                        type="button"
+                        data-message="How do I pay for my parcel?">
+                    💰 Payment Guide
+                </button>
+
+                <button class="quick-chat"
+                        type="button"
+                        data-message="Where do I collect my parcel?">
+                    🏫 Collection Location
+                </button>
+
+                <button class="quick-chat"
+                        type="button"
+                        data-message="What are the collection hours?">
+                    ⏰ Collection Hours
+                </button>
+            </div>
+
+            <form id="parcel-chat-form">
+                <input id="parcel-chat-input"
+                       type="text"
+                       placeholder="Type your question..."
+                       required>
+
+                <button type="submit">Send</button>
+            </form>
+
+            <div class="staff-buttons">
+                <button id="load-staff-replies" type="button">
+                    👀 Replies
+                </button>
+
+                <button id="ask-staff-btn" type="button">
+                    👩‍💼 Ask Staff
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chatbox.js') }}"></script>
+
+    {% endif %}
+
+</body>
+</html>

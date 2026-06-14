@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<div class="app-shell student-shell">
+    <aside class="app-sidebar desktop-only">
+        <div class="brand-box"><div class="brand-icon"><i class="fa-solid fa-cube"></i></div><h2>Smart Parcel<br>Collection System</h2></div>
+        <nav class="side-nav">
+            <a class="active" href="{{ url_for('dashboard', username=username) }}"><i class="fa-solid fa-house"></i> Dashboard</a>
+            <a href="#my-parcels"><i class="fa-solid fa-box-open"></i> My Parcels</a>
+            <a href="#payment-section"><i class="fa-solid fa-credit-card"></i> Payment</a>
+            <a href="#my-parcels"><i class="fa-solid fa-qrcode"></i> QR Code</a>
+            <a href="{{ url_for('notices', username=username) }}"><i class="fa-regular fa-bell"></i> Notices</a>
+            <a href="#profile-card"><i class="fa-regular fa-user"></i> Profile</a>
+            <a href="{{ url_for('login') }}"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        </nav>
+        <div class="sidebar-illustration"><i class="fa-solid fa-truck-fast"></i></div>
+    </aside>
+    <main class="app-main">{% block student_content %}{% endblock %}</main>
+    <nav class="bottom-nav mobile-only">
+        <a class="active" href="{{ url_for('dashboard', username=username) }}"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="#my-parcels"><i class="fa-solid fa-box-open"></i><span>My Parcels</span></a>
+        <a href="#payment-section"><i class="fa-solid fa-credit-card"></i><span>Payment</span></a>
+        <a href="#my-parcels"><i class="fa-solid fa-qrcode"></i><span>QR Code</span></a>
+        <a href="#profile-card-mobile"><i class="fa-regular fa-user"></i><span>Profile</span></a>
+    </nav>
+</div>
+{% endblock %}

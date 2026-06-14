@@ -1,0 +1,16 @@
+{% extends 'student_base.html' %}
+
+{% block student_content %}
+<div class="auth-page">
+    <div class="auth-box small-auth">
+        <h1>Verify Code</h1>
+
+        <form method="POST">
+            <label>4-Digit Code:</label>
+            <input type="text" name="code" maxlength="4" pattern="[0-9]{4}" required>
+
+            <button class="auth-btn" type="submit">Verify</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

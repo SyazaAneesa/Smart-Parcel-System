@@ -1,0 +1,36 @@
+{% extends 'student_base.html' %}
+
+{% block student_content %}
+<div class="dashboard-box">
+
+    <h2>🔔 Notice Center</h2>
+
+    <a href="{{ url_for('dashboard', username=username) }}" class="btn btn-secondary mb-3">
+        Back to Dashboard
+    </a>
+
+    {% if notices %}
+        {% for notice in notices %}
+            <div class="card mb-3 p-3">
+
+                {% if notice.type == 'announcement' %}
+                    <h5>📢 {{ notice.title }}</h5>
+                    <span class="badge bg-info">Announcement</span>
+                {% else %}
+                    <h5>🔔 {{ notice.title }}</h5>
+                    <span class="badge bg-warning">Notification</span>
+                {% endif %}
+
+                <p class="mt-2">{{ notice.message }}</p>
+
+                <small class="text-muted">
+                    Posted on: {{ notice.created_at }}
+                </small>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No notices yet.</p>
+    {% endif %}
+
+</div>
+{% endblock %}

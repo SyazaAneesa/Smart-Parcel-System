@@ -1,0 +1,332 @@
+{% extends 'student_base.html' %}
+
+{% block student_content %}
+
+{% set total_parcels = parcels|length %}
+{% set paid_parcels = parcels|selectattr('payment_status','equalto','Paid')|list|length %}
+{% set ready_parcels = parcels|selectattr('payment_status','equalto','Paid')|rejectattr('collection_status','equalto','Collected')|list|length %}
+{% set not_collected = parcels|rejectattr('collection_status','equalto','Collected')|list|length %}
+
+<header class="dash-header">
+    <div>
+        <h1>Welcome, {{ username }}! 👋</h1>
+        <p>Here are your parcel updates.</p>
+    </div>
+
+    <div class="header-actions">
+        <a href="{{ url_for('notices', username=username) }}" class="top-bell">
+            <i class="fa-regular fa-bell"></i>
+            <span>{{ unread_count|default(0) }}</span>
+        </a>
+    </div>
+</header>
+
+<form method="POST" action="{{ url_for('pay_selected', username=username) }}" id="parcel-payment-form">
+
+    <section class="student-mobile-profile mobile-only" id="profile-card-mobile">
+        {% if profile_pic %}
+            <img src="{{ url_for('static', filename=profile_pic) }}">
+        {% else %}
+            <div class="profile-placeholder small">{{ username[0]|upper }}</div>
+        {% endif %}
+
+        <div>
+            <h3>{{ username }}</h3>
+            <p>{{ student_email }}</p>
+            <button type="button" class="outline-btn" onclick="document.getElementById('profileInputMobile').click()">
+                <i class="fa-solid fa-camera"></i> Change Picture
+            </button>
+        </div>
+    </section>
+
+    <section class="stats-grid">
+        <div class="stat-card">
+            <div class="icon pink">
+                <i class="fa-solid fa-cube"></i>
+            </div>
+            <h3>{{ total_parcels }}</h3>
+            <p>Total Parcels</p>
+        </div>
+
+        <div class="stat-card">
+            <div class="icon green">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3>{{ paid_parcels }}</h3>
+            <p>Paid Parcels</p>
+        </div>
+
+        <div class="stat-card">
+            <div class="icon orange">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <h3>{{ ready_parcels }}</h3>
+            <p>Ready for Collection</p>
+        </div>
+
+        <div class="stat-card mobile-only">
+            <div class="icon blue">
+                <i class="fa-solid fa-truck"></i>
+            </div>
+            <h3>{{ not_collected }}</h3>
+            <p>Not Collected</p>
+        </div>
+    </section>
+
+    <section class="two-col desktop-only">
+        <div class="glass-card profile-card" id="profile-card">
+            <h2><i class="fa-regular fa-user"></i> My Profile</h2>
+
+            <div class="profile-row">
+                {% if profile_pic %}
+                    <img src="{{ url_for('static', filename=profile_pic) }}" class="profile-img-large">
+                {% else %}
+                    <div class="profile-placeholder">{{ username[0]|upper }}</div>
+                {% endif %}
+
+                <div>
+                    <h3>{{ username }}</h3>
+                    <p>Student ID: {{ student_id }}</p>
+                    <p>Email: {{ student_email }}</p>
+                    <button type="button" class="outline-btn" onclick="document.getElementById('profileInput').click()">
+                        <i class="fa-solid fa-camera"></i> Change Picture
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card notices-card">
+            <div class="card-head">
+                <h2><i class="fa-regular fa-bell"></i> Notice Center</h2>
+                <a href="{{ url_for('notices', username=username) }}">View All</a>
+            </div>
+
+            {% for notice in recent_notices %}
+                <div class="notice-item">
+                    <div class="notice-icon pink">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+
+                    <div>
+                        <strong>{{ notice.title }}</strong>
+                        <p>{{ notice.message }}</p>
+                    </div>
+
+                    <small>{{ notice.created_at }}</small>
+                </div>
+            {% else %}
+                <p class="muted">No notices yet.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="glass-card parcel-section" id="my-parcels">
+        <div class="card-head">
+            <h2><i class="fa-solid fa-cube"></i> My Parcels</h2>
+            <a href="#my-parcels">View All Parcels</a>
+        </div>
+
+        <div class="desktop-table">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>Tracking Number</th>
+                        <th>Courier</th>
+                        <th>Arrival Date</th>
+                        <th>Quantity</th>
+                        <th>Payment Status</th>
+                        <th>Collection Status</th>
+                        <th>QR Code</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for parcel in parcels %}
+                        <tr>
+                            <td>
+                                {% if parcel.payment_status != 'Paid' %}
+                                    <input type="checkbox" class="parcel-check" name="parcel_ids" value="{{ parcel.id }}">
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td><strong>{{ parcel.tracking_number }}</strong></td>
+                            <td>{{ parcel.courier }}</td>
+                            <td>{{ parcel.arrival_date }}</td>
+                            <td>{{ parcel.quantity }}</td>
+
+                            <td>
+                                <span class="status-pill {% if parcel.payment_status == 'Paid' %}paid{% else %}unpaid{% endif %}">
+                                    {{ parcel.payment_status }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="status-pill {% if parcel.collection_status == 'Collected' %}paid{% elif parcel.payment_status == 'Paid' %}ready{% else %}neutral{% endif %}">
+                                    {% if parcel.collection_status == 'Collected' %}
+                                        Collected
+                                    {% elif parcel.payment_status == 'Paid' %}
+                                        Ready
+                                    {% else %}
+                                        Not Collected
+                                    {% endif %}
+                                </span>
+                            </td>
+
+                            <td>
+                                {% if parcel.qr_code and parcel.collection_status != 'Collected' %}
+                                    <a class="qr-mobile-btn"
+                                       href="{{ url_for('static', filename='qr_codes/' ~ parcel.qr_code) }}"
+                                       target="_blank">
+                                        View QR
+                                    </a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="8">No parcels found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mobile-cards">
+    {% for parcel in parcels %}
+        <label class="parcel-list-item mobile-parcel-card">
+
+            {% if parcel.payment_status != 'Paid' %}
+                <input type="checkbox" class="parcel-check mobile-check" name="parcel_ids" value="{{ parcel.id }}">
+            {% endif %}
+
+            <div class="parcel-icon">
+                <i class="fa-solid fa-cube"></i>
+            </div>
+
+            <div class="parcel-info">
+                <h3>{{ parcel.tracking_number }}</h3>
+                <p>{{ parcel.courier }}</p>
+                <p>Arrived: {{ parcel.arrival_date }}</p>
+
+                {% if parcel.qr_code and parcel.collection_status != 'Collected' %}
+                    <a class="qr-mobile-btn"
+                       href="{{ url_for('static', filename='qr_codes/' ~ parcel.qr_code) }}"
+                       target="_blank">
+                        View QR Code
+                    </a>
+                {% endif %}
+            </div>
+
+            <span class="status-pill {% if parcel.collection_status == 'Collected' %}paid{% elif parcel.payment_status == 'Paid' %}ready{% else %}neutral{% endif %}">
+                {% if parcel.collection_status == 'Collected' %}
+                    Collected
+                {% elif parcel.payment_status == 'Paid' %}
+                    Ready
+                {% else %}
+                    Not Collected
+                {% endif %}
+            </span>
+        </label>
+    {% else %}
+        <p class="muted">No parcels found.</p>
+    {% endfor %}
+</div>
+
+    </section>
+
+    <section class="glass-card payment-modern" id="payment-section">
+        <h2><i class="fa-regular fa-credit-card"></i> Select Payment Method</h2>
+
+        <div class="payment-layout">
+            <div class="payment-options">
+                <label class="pay-option">
+                    <div class="pay-inner">
+                        <input type="radio" name="payment_method" value="Credit Card" required>
+                        <span><i class="fa-solid fa-credit-card"></i></span>
+                        <div class="pay-text">
+                            <strong>Credit/Debit Card</strong>
+                            <p>Pay with Visa, MasterCard, etc.</p>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="pay-option">
+                    <div class="pay-inner">
+                    <input type="radio" name="payment_method" value="Online Banking" required>
+                    <span><i class="fa-solid fa-building-columns"></i></span>
+                    <div class="pay-text">
+                        <strong>Online Banking</strong>
+                        <p>Pay via your preferred bank</p>
+                    </div>
+                    </div>
+                </label>
+
+
+                <label class="pay-option">
+                    <div class="pay-inner">
+                    <input type="radio" name="payment_method" value="DuitNow QR" required>
+                    <span><i class="fa-solid fa-qrcode"></i></span>
+                    <div class="pay-text">
+                        <strong>DuitNow QR</strong>
+                        <p>Scan and pay easily</p>
+                    </div>
+                    </div>
+                </label>
+
+                <label class="pay-option">
+                    <div class="pay-inner">
+                    <input type="radio" name="payment_method" value="Touch n Go eWallet" required>
+                    <span><b>Touch<br>nGo</b></span>
+                    <div class="pay-text">
+                        <strong>Touch 'n Go eWallet</strong>
+                        <p>Pay using Touch 'n Go eWallet</p>
+                    </div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="total-card">
+                <p>Total Amount</p>
+                <h3>RM <span id="total-amount">0.00</span></h3>
+                <button type="submit" class="primary-btn">Proceed to Payment</button>
+            </div>
+        </div>
+    </section>
+
+</form>
+
+<form method="POST" action="{{ url_for('upload_profile', username=username) }}" enctype="multipart/form-data" class="hidden-profile-form">
+    <input id="profileInput" type="file" name="profile_pic" onchange="this.form.submit()">
+</form>
+
+<form method="POST" action="{{ url_for('upload_profile', username=username) }}" enctype="multipart/form-data" class="hidden-profile-form">
+    <input id="profileInputMobile" type="file" name="profile_pic" onchange="this.form.submit()">
+</form>
+
+<script>
+const parcelChecks = document.querySelectorAll('.parcel-check');
+const totalSpan = document.getElementById('total-amount');
+
+function updateTotal(){
+    let total = 0;
+
+    parcelChecks.forEach(function(cb){
+        if(cb.checked){
+            total += 1;
+        }
+    });
+
+    totalSpan.textContent = total.toFixed(2);
+}
+
+parcelChecks.forEach(function(cb){
+    cb.addEventListener('change', updateTotal);
+});
+</script>
+
+{% endblock %}

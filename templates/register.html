@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-box">
+
+    <h1>Student Registration</h1>
+    <div class="cute-line"></div>
+
+        <form method="POST">
+            <label>Username:</label>
+            <div class="input-box">
+                <i class='bx bx-user'></i>
+                <input type="text" name="username" placeholder="Enter username" required>
+            </div>
+
+            <label>Student ID:</label>
+            <div class="input-box">
+                <i class='bx bx-id-card'></i>
+                <input type="text" name="student_id" placeholder="Enter student ID" required>
+            </div>
+
+            <label>Full Name:</label>
+            <div class="input-box">
+                <i class='bx bx-user-heart'></i>
+                <input type="text" name="fullname" placeholder="Enter full name" required>
+            </div>
+
+            <label>Email:</label>
+            <div class="input-box">
+                <i class='bx bx-envelope'></i>
+                <input type="email" name="email" placeholder="Enter email address" required>
+            </div>
+
+            <label>Phone:</label>
+            <div class="input-box">
+                <i class='bx bx-phone'></i>
+                <input type="text" name="phone" placeholder="Enter phone number" required>
+            </div>
+
+            <label>Password:</label>
+            <div class="input-box">
+                <i class='bx bx-lock-alt'></i>
+                <input type="password" name="password" id="password" placeholder="Enter password" required>
+                <i class='bx bx-show eye-icon' onclick="togglePassword()"></i>
+            </div>
+
+            <button class="auth-btn" type="submit">Register</button>
+
+            <p class="auth-link">
+                Already have an account?
+                <a href="{{ url_for('login') }}">Login</a>
+            </p>
+        </form>
+</div>
+</div>
+
+<script>
+function togglePassword() {
+    const input = document.getElementById("password");
+    input.type = input.type === "password" ? "text" : "password";
+}
+</script>
+{% endblock %}

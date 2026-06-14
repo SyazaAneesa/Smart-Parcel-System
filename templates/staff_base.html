@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<video autoplay muted loop playsinline class="staff-video-bg">
+    <source src="{{ url_for('static', filename='video/background_staff.mp4') }}" type="video/mp4">
+</video>
+
+<div class="staff-video-overlay"></div>
+
+<div class="app-shell staff-shell">
+    <aside class="app-sidebar desktop-only">
+        <div class="brand-box">
+            <div class="brand-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <h2>Staff<br>Dashboard</h2>
+        </div>
+
+        <nav class="side-nav">
+            <a class="active" href="{{ url_for('staff_dashboard', username=staff_username) }}"><i class="fa-solid fa-house"></i> Dashboard</a>
+            <a href="{{ url_for('staff_checkin', username=staff_username) }}"><i class="fa-solid fa-plus"></i> Parcel Check-in</a>
+            <a href="#recent-parcels"><i class="fa-solid fa-list"></i> Parcel Records</a>
+            <a href="{{ url_for('staff_qr_scan', username=staff_username) }}"><i class="fa-solid fa-qrcode"></i> QR Scanner</a>
+            <a href="#announcement-section"><i class="fa-solid fa-bullhorn"></i> Notices</a>
+            <a href="{{ url_for('staff_login') }}"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        </nav>
+    </aside>
+
+<div class="staff-video-overlay"></div>
+
+    <main class="app-main">
+        {% block staff_content %}{% endblock %}
+    </main>
+
+    <nav class="bottom-nav mobile-only">
+        <a class="active" href="{{ url_for('staff_dashboard', username=staff_username) }}"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="{{ url_for('staff_checkin', username=staff_username) }}"><i class="fa-solid fa-plus"></i><span>Check-in</span></a>
+        <a href="#recent-parcels"><i class="fa-solid fa-list"></i><span>Records</span></a>
+        <a href="{{ url_for('staff_qr_scan', username=staff_username) }}"><i class="fa-solid fa-qrcode"></i><span>Scanner</span></a>
+        <a href="#announcement-section"><i class="fa-solid fa-bullhorn"></i><span>Notices</span></a>
+    </nav>
+</div>
+{% endblock %}

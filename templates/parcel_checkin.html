@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="card p-4 shadow mx-auto" style="max-width: 500px;">
+    <h4 class="mb-3 text-center">Check-In Parcel</h4>
+
+    <form method="POST">
+        <input type="text" class="form-control mb-2" name="student_username" placeholder="Student Username" required>
+
+        <input type="text" class="form-control mb-2" name="tracking_number" placeholder="Tracking Number" required>
+
+        <input type="text" class="form-control mb-2" name="courier" placeholder="Courier Service" required>
+
+        <input type="number" class="form-control mb-2" name="quantity" value="1" min="1">
+
+        <button type="submit" class="btn btn-primary w-100 mt-2">Check-In</button>
+    </form>
+</div>
+
+{% endblock %}

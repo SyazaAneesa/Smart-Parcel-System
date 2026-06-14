@@ -1,0 +1,33 @@
+{% extends 'student_base.html' %}
+
+{% block student_content %}
+
+<div class="payment-card">
+
+    <div class="dark-overlay"></div>
+
+    <div class="card-content">
+
+        <h1>Payment Successful!</h1>
+
+        <p>QR code(s) for collection:</p>
+
+        {% for qr in qr_codes %}
+        <div class="qr-box">
+            <img src="{{ url_for('static', filename='qr_codes/' ~ qr) }}" width="220">
+        </div>
+        {% endfor %}
+
+        <br>
+
+        <a href="{{ url_for('dashboard', username=username) }}"
+           class="btn btn-success mt-3">
+            <i class="fa-solid fa-house"></i>
+            Back to Dashboard
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends 'staff_base.html' %}
+{% block staff_content %}
+
+{% set total_parcels = parcels|length %}
+{% set collected_parcels = parcels|selectattr('collection_status','equalto','Collected')|list|length %}
+{% set pending_parcels = parcels|rejectattr('collection_status','equalto','Collected')|list|length %}
+
+<header class="dash-header">
+    <div>
+        <h1>Staff Dashboard 👋</h1>
+        <p>Manage parcels, announcements and student collection records.</p>
+    </div>
+
+    <div class="header-actions">
+        <button class="primary-btn small-btn" onclick="openAnnouncementModal()">
+            <i class="fa-solid fa-bullhorn"></i> Add Announcement
+        </button>
+
+        <a href="#announcement-section" class="top-bell">
+            <i class="fa-regular fa-bell"></i>
+            <span>{{ unread_count|default(0) }}</span>
+        </a>
+    </div>
+</header>
+
+<section class="stats-grid staff-stats">
+    <div class="stat-card">
+        <div class="icon pink"><i class="fa-solid fa-cube"></i></div>
+        <h3>{{ total_parcels }}</h3>
+        <p>Total Parcels</p>
+    </div>
+
+    <div class="stat-card">
+        <div class="icon green"><i class="fa-solid fa-check"></i></div>
+        <h3>{{ collected_parcels }}</h3>
+        <p>Collected Parcels</p>
+    </div>
+
+    <div class="stat-card">
+        <div class="icon orange"><i class="fa-solid fa-clock"></i></div>
+        <h3>{{ pending_parcels }}</h3>
+        <p>Pending Parcels</p>
+    </div>
+
+    <div class="stat-card">
+        <div class="icon blue"><i class="fa-solid fa-calendar-day"></i></div>
+        <h3>{{ today_checkins|default(0) }}</h3>
+        <p>Today's Check-ins</p>
+    </div>
+</section>
+
+<section class="quick-actions">
+    <a href="{{ url_for('staff_checkin') }}" class="quick-card">
+        <i class="fa-solid fa-plus"></i>
+        <h3>Parcel Check-in</h3>
+        <p>Add newly arrived parcels.</p>
+    </a>
+
+    <a href="{{ url_for('staff_qr_scan') }}" class="quick-card">
+        <i class="fa-solid fa-qrcode"></i>
+        <h3>QR Scanner</h3>
+        <p>Scan student collection QR code.</p>
+    </a>
+
+    <button class="quick-card button-card" onclick="openAnnouncementModal()">
+        <i class="fa-solid fa-bullhorn"></i>
+        <h3>Announcement</h3>
+        <p>Send notice to students.</p>
+    </button>
+</section>
+
+<section class="glass-card parcel-section" id="recent-parcels">
+    <div class="card-head">
+        <h2><i class="fa-solid fa-list"></i> Recent Parcel Records</h2>
+        <form method="GET" action="{{ url_for('staff_dashboard', username=staff_username) }}" class="search-box">
+            <input type="text" name="search" placeholder="Search username or tracking..." value="{{ request.args.get('search','') }}">
+            <button type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </form>
+    </div>
+
+    <div class="desktop-table">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Tracking Number</th>
+                    <th>Student</th>
+                    <th>Courier</th>
+                    <th>Arrival Date</th>
+                    <th>Payment</th>
+                    <th>Collection</th>
+                    <th>Overdue</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for parcel in parcels %}
+                <tr>
+                    <td><strong>{{ parcel.tracking_number }}</strong></td>
+                    <td>{{ parcel.username }}</td>
+                    <td>{{ parcel.courier }}</td>
+                    <td>{{ parcel.arrival_date }}</td>
+                    <td>
+                        <span class="status-pill {% if parcel.payment_status == 'Paid' %}paid{% else %}unpaid{% endif %}">
+                            {{ parcel.payment_status }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status-pill {% if parcel.collection_status == 'Collected' %}paid{% elif parcel.payment_status == 'Paid' %}ready{% else %}neutral{% endif %}">
+                            {% if parcel.collection_status == 'Collected' %}
+                            Collected
+                            {% elif parcel.payment_status == 'Paid' %}
+                            Ready
+                            {% else %}
+                            Not Collected
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if parcel.overdue %}
+                        <span class="status-pill overdue">Overdue</span>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="muted">No parcel records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mobile-cards">
+        {% for parcel in parcels %}
+        <div class="parcel-list-item">
+            <div class="parcel-icon"><i class="fa-solid fa-cube"></i></div>
+
+            <div class="parcel-info">
+                <h3>{{ parcel.tracking_number }}</h3>
+                <p>{{ parcel.username }} • {{ parcel.courier }}</p>
+                <p>Arrived: {{ parcel.arrival_date }}</p>
+            </div>
+
+            <div class="mobile-status-group">
+                <span class="status-pill {% if parcel.collection_status == 'Collected' %}paid{% elif parcel.payment_status == 'Paid' %}ready{% else %}neutral{% endif %}">
+                    {% if parcel.collection_status == 'Collected' %}
+                    Collected
+                    {% elif parcel.payment_status == 'Paid' %}
+                    Ready
+                    {% else %}
+                    Pending
+                    {% endif %}
+                </span>
+
+                {% if parcel.overdue %}
+                <span class="status-pill overdue">Overdue</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="glass-card notices-card full-width" id="announcement-section">
+    <div class="card-head">
+        <h2><i class="fa-solid fa-bullhorn"></i> Announcement Board</h2>
+        <button class="outline-btn" onclick="openAnnouncementModal()">New Announcement</button>
+    </div>
+
+    {% for notice in announcements|default([]) %}
+    <div class="notice-item">
+        <div class="notice-icon pink"><i class="fa-solid fa-bullhorn"></i></div>
+        <div>
+            <strong>{{ notice.title }}</strong>
+            <p>{{ notice.message }}</p>
+        </div>
+        <small>{{ notice.created_at }}</small>
+    </div>
+    {% else %}
+    <p class="muted">No announcements yet.</p>
+    {% endfor %}
+</section>
+
+<div class="modal-overlay" id="announcementModal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2><i class="fa-solid fa-bullhorn"></i> Add Announcement</h2>
+            <button onclick="closeAnnouncementModal()" class="close-btn">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_notice') }}">
+            <label>Title</label>
+            <input type="text" name="title" placeholder="Example: Parcel collection reminder" required>
+
+            <label>Message</label>
+            <textarea name="message" rows="5" placeholder="Write announcement message..." required></textarea>
+
+            <button type="submit" class="primary-btn modal-submit">Post Announcement</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAnnouncementModal(){
+    document.getElementById('announcementModal').classList.add('show');
+}
+
+function closeAnnouncementModal(){
+    document.getElementById('announcementModal').classList.remove('show');
+}
+
+window.onclick = function(event){
+    const modal = document.getElementById('announcementModal');
+    if(event.target === modal){
+        closeAnnouncementModal();
+    }
+}
+</script>
+
+{% endblock %}
