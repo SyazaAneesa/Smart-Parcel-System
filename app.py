@@ -9,6 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 import random
 from datetime import date, datetime, timedelta
+import threading
 
 app = Flask(__name__)
 app.secret_key = "secretkey"
@@ -387,6 +388,39 @@ def staff_dashboard(username):
 
 
 @app.route('/staff/checkin', methods=['GET','POST'])
+def send_parcel_email(student_email, student_username, tracking_number):
+    def job():
+        subject = "Parcel Arrival Notification"
+        body = f"""
+        Hello {student_username},
+
+        Your parcel has arrived.
+
+        Tracking Number: {tracking_number}
+
+        Please login to the Smart Parcel Collection System and make payment to generate your QR code.
+
+        Thank you.
+        """
+
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = student_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        try:
+            server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+            server.quit()
+            print("Parcel email sent.")
+        except Exception as e:
+            print("Failed to send parcel email:", e)
+
+    threading.Thread(target=job, daemon=True).start()
+
 def staff_checkin():
     if request.method == 'POST':
         student_username = request.form.get('student_username') or request.form.get('username')
@@ -424,34 +458,11 @@ def staff_checkin():
         conn.close()
 
         if student and student['email']:
-            subject = "Parcel Arrival Notification"
-            body = f"""
-    Hello {student_username},
-
-    Your parcel has arrived.
-
-    Tracking Number: {tracking_number}
-
-    Please login to the Smart Parcel Collection System and make payment to generate your QR code.
-
-    Thank you.
-    """
-
-            msg = MIMEMultipart()
-            msg["From"] = SENDER_EMAIL
-            msg["To"] = student["email"]
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
-
-            try:
-                server = smtplib.SMTP("smtp.gmail.com", 587)
-                server.starttls()
-                server.login(SENDER_EMAIL, SENDER_PASSWORD)
-                server.send_message(msg)
-                server.quit()
-            except Exception as e:
-                print("Failed to send email:", e)
-
+            send_parcel_email(
+            student['email'],
+            student_username,
+            tracking_number
+        )
         flash("Parcel checked in and notification sent!")
         return redirect(url_for('staff_dashboard', username=session['staff_username']))
     return render_template('parcel_checkin.html')
