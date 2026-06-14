@@ -23,8 +23,8 @@ for folder in [UPLOAD_FOLDER, QR_FOLDER]:
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 DATABASE = 'database.db'
 
-SENDER_EMAIL = "galaxticc@gmail.com"
-SENDER_PASSWORD = "iodsbmqwpmqvpukv"
+SENDER_EMAIL = os.getenv("galaxticc@gmail.com")
+SENDER_PASSWORD = os.getenv("iodsbmqwpmqvpukv")
 
 
 def allowed_file(filename):
