@@ -37,7 +37,7 @@ def get_db_connection():
     return conn
 
 
-def send_parcel_email(student_email, student_username, tracking_number, qr_path):
+def send_qr_email(student_email, student_username, tracking_number, qr_path):
     subject = "Parcel Collection QR Code"
 
     body = f"""
@@ -312,7 +312,7 @@ def pay_selected(username):
         ).fetchone()
 
         if student and student['email']:
-            send_parcel_email(
+            send_qr_email(
                 student['email'],
                 username,
                 parcel['tracking_number'],
@@ -386,8 +386,6 @@ def staff_dashboard(username):
     )
 
 
-
-@app.route('/staff/checkin', methods=['GET','POST'])
 def send_parcel_email(student_email, student_username, tracking_number):
     def job():
         subject = "Parcel Arrival Notification"
@@ -421,6 +419,7 @@ def send_parcel_email(student_email, student_username, tracking_number):
 
     threading.Thread(target=job, daemon=True).start()
 
+@app.route('/staff/checkin', methods=['GET','POST'])
 def staff_checkin():
     if request.method == 'POST':
         student_username = request.form.get('student_username') or request.form.get('username')
@@ -466,7 +465,6 @@ def staff_checkin():
         flash("Parcel checked in and notification sent!")
         return redirect(url_for('staff_dashboard', username=session['staff_username']))
     return render_template('parcel_checkin.html')
-
 
 @app.route('/staff/qr_scan', methods=['GET', 'POST'])
 def staff_qr_scan():
