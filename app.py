@@ -753,7 +753,7 @@ def notices(username):
 def add_notice():
     title = request.form['title']
     message = request.form['message']
-    notice_type = request.form['type']
+    notice_type = request.form.get('type', 'announcement')
     recipient = request.form.get('recipient', 'all')
 
     conn = get_db_connection()
