@@ -144,6 +144,14 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    conn=get_db_connection()
+
+    try:
+        conn.execute("ALTER TABLE parcels ADD COLUMN collection_date TEXT")
+    except:
+        pass
+    
     conn.commit()
     conn.close()
 
@@ -464,14 +472,33 @@ def staff_qr_scan():
                 return render_template('staff_qr_scan.html', parcel_info=None)
 
             conn = get_db_connection()
+
             parcel_info = conn.execute(
                 "SELECT * FROM parcels WHERE id=?",
                 (parcel_id,)
             ).fetchone()
-            conn.close()
 
             if not parcel_info:
+                conn.close()
                 flash("Invalid QR.")
+                return render_template('staff_qr_scan.html', parcel_info=None)
+
+            conn.execute("""
+                UPDATE parcels
+                SET collection_status = 'Collected',
+                    collection_date = DATE('now')
+                WHERE id = ?
+            """, (parcel_id,))
+
+            conn.commit()
+            conn.close()
+
+            flash("Parcel scanned successfully and marked as collected!")
+
+            return redirect(url_for(
+                'staff_dashboard',
+                username=session.get('staff_username')
+            ))
 
     return render_template('staff_qr_scan.html', parcel_info=parcel_info)
 
