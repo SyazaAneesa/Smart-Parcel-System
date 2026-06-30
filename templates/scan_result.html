@@ -1,0 +1,55 @@
+{% extends 'staff_base.html' %}
+{% block staff_content %}
+<div class="container mt-4">
+<div> class="card shadow p-4 mx-auto" style="max-width: 600px; border-radius: 10px; background-color: #f8f9fa;">
+    <h3 class="text-center mb-4">Parcel Information</h3>
+
+    <table class="table table-bordered"
+        <tr>
+            <th>Student Username</th>
+            <td>{{ parcel_info['student_username'] }}</td>
+        </tr>
+        <tr>
+            <th>Tracking Number</th>
+            <td>{{ parcel_info['tracking_number'] }}</td>
+        </tr>
+        <tr>
+            <th>Courier Service</th>
+            <td>{{ parcel_info['courier'] }}</td>
+        </tr>
+        <tr>
+            <th>Arrival Date</th>
+            <td>{{ parcel_info['arrival_date'] }}</td>
+        </tr>
+        <tr>
+            <th>Quantity</th>
+            <td>{{ parcel_info['quantity'] }}</td>
+        </tr>
+        <tr>
+            <th>Status</th>
+            <td>{{ parcel_info['status'] }}</td>
+        </tr>
+        <tr>
+            <th>Collection status</th>
+            <td>{{ parcel_info['collection_status'] }}</td>
+        </tr>
+    </table>
+
+    {% if parcel.payment_status == 'Paid' and parcel.collection_status != 'Collected' %}
+        <form method="POST" action="{{ url_for('release_parcel', tracking_number=parcel_info['tracking_number']) }}">
+            <button type="submit" class="btn btn-success w-100 mt-2">Release Parcel</button>
+        </form>
+    {% elif parcel.payment_status != 'Paid' %}
+        <div class="alert alert-warning mt-3" role="alert">
+            Payment is pending. Please ensure the payment is completed before releasing the parcel.
+        </div>
+    {% elif parcel.collection_status == 'Collected' %}
+        <div class="alert alert-info mt-3" role="alert">
+            This parcel has already been collected.
+        </div>
+    {% endif %}
+
+    <a href="{{ url_for('staff_qr_scan') }}" class="btn btn-secondary w-100 mt-3">Scan Another QR Code</a>
+</div>
+</div>
+{% endblock %}

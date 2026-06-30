@@ -164,15 +164,33 @@
                             </td>
 
                             <td>
-                                <span class="status-pill {% if parcel.collection_status == 'Collected' %}paid{% elif parcel.payment_status == 'Paid' %}ready{% else %}neutral{% endif %}">
+                                <span class="status-pill 
                                     {% if parcel.collection_status == 'Collected' %}
-                                        Collected
+                                        paid
+                                    {% elif parcel.payment_status == 'Pending Confirmation' %}
+                                        ready
+                                    {% elif parcel.payment_status == 'Paid' %}
+                                        ready
+                                    {% else %}
+                                        neutral
+                                    {% endif %}
+                                ">
+                                    {% if parcel.collection_status == 'Collected' %}
+                                        Paid
+                                    {% elif parcel.payment_status == 'Pending Confirmation' %}
+                                        Pending Confirmation
                                     {% elif parcel.payment_status == 'Paid' %}
                                         Ready
                                     {% else %}
                                         Not Collected
                                     {% endif %}
+
                                 </span>
+                                {% if parcel.collection_status == 'Pending Confirmation' %}
+                                    <form method="POST" action="{{ url_for('confirm_collection', parcel_id=parcel.id) }}" style="margin-top: 8px;">
+                                        <button type="submit" class="btn btn-success btn-sm">Collected</button>
+                                    </form>
+                                {% endif %}
                             </td>
 
                             <td>
