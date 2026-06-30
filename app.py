@@ -526,6 +526,7 @@ def staff_qr_scan():
             """, (parcel_id,))
 
             conn.commit()
+            conn.close()
 
             flash("QR scanned succesfully! Please confirm collection.")
 
