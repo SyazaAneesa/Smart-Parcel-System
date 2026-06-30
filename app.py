@@ -841,23 +841,6 @@ def add_notice():
     flash("Notice added successfully!")
     return redirect(url_for('staff_dashboard', username=session['staff_username']))
 
-@app.route("/confirm_collection/<int:parcel_id>", methods=["POST"])
-def confirm_collection(parcel_id):
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE parcels
-        SET status='Collected'
-        WHERE id=?
-    """, (parcel_id,))
-    conn.commit()
-    conn.close()
-
-    flash("Parcel collected successfully!")
-    return redirect(url_for("student_dashboard", username=session['student_username']))
-
 init_db()
 if __name__ == "__main__":
     app.run(debug=True)
