@@ -238,7 +238,7 @@ def dashboard(username):
 
     cursor.execute("""
         UPDATE parcels
-        SET collection status = 'Collected'
+        SET collection_status = 'Collected'
         WHERE student_username = ? AND collection_status = 'Pending Confirmation'
         AND DATETIME(collection_time, '+3 days') <= DATETIME('now')
     """)
@@ -324,7 +324,7 @@ def pay_selected(username):
         c.execute(
             """
             UPDATE parcels
-            SET status='Pending Confirmation',
+            SET collection_status='Pending Confirmation',
             collection_time=CURRENT_TIMESTAMP
             WHERE id=?
             """,
