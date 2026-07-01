@@ -186,6 +186,14 @@ def init_db():
         )
     ''')
 
+    # Reset admin account
+    c.execute("DELETE FROM staff WHERE username = ?", ("admin",))
+
+    c.execute("""
+              INSERT INTO STAFF (username, password)
+              VALUES (?, ?)
+    """, ("admin", generate_password_hash("admin123")))
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS notices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
