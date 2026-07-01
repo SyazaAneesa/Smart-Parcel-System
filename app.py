@@ -232,7 +232,7 @@ def login():
 
 @app.route('/dashboard/<username>')
 def dashboard(username):
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect('database.db', timeout=30)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
@@ -243,6 +243,7 @@ def dashboard(username):
         AND DATETIME(collection_date, '+3 days') <= DATETIME('now')
     """)
     conn.commit()
+    conn.close()
 
     cursor.execute("SELECT * FROM students WHERE username = ?", (username,))
     user = cursor.fetchone()
