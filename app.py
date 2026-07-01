@@ -632,7 +632,7 @@ def chatbot_ask():
             if parcel['payment_status'] != 'Paid':
                 reply += " Please select this parcel in your dashboard and proceed with payment before collection."
             elif parcel['collection_status'] != 'Collected':
-                reply += " Your parcel is ready to collect. Please show your QR code to staff."
+                reply += " Your parcel is ready for collection. Please show your QR code to staff."
             else:
                 reply += " This parcel has already been collected."
 
