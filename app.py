@@ -239,9 +239,9 @@ def dashboard(username):
     cursor.execute("""
         UPDATE parcels
         SET collection_status = 'Collected'
-        WHERE student_username = ? AND collection_status = 'Pending Confirmation'
+        WHERE collection_status = 'Pending Confirmation'
         AND DATETIME(collection_date, '+3 days') <= DATETIME('now')
-    """, (username,))
+    """)
     conn.commit()
 
     cursor.execute("SELECT * FROM students WHERE username = ?", (username,))
