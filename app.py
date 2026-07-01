@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 import threading
 
 app = Flask(__name__)
-app.secret_key = "secretkey"
+app.secret_key = os.getenv("SECRET_KEY", "secretkey")
 
 UPLOAD_FOLDER = 'static/profile_pics'
 QR_FOLDER = 'static/qr_codes'
@@ -33,22 +33,26 @@ def allowed_file(filename):
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def send_qr_email(student_email, student_username, tracking_number, qr_path):
+    if not SENDER_EMAIL or not SENDER_PASSWORD:
+        print("Email not sent: SENDER_EMAIL or SENDER_PASSWORD missing")
+        return
+
     subject = "Parcel Collection QR Code"
 
     body = f"""
 Hello {student_username},
 
-Your parcel has arrived.
+Your parcel payment is successful.
 
 Tracking Number: {tracking_number}
 
-Please make payment in the student dashboard and show the QR code to staff when collecting your parcel.
+Please show this QR code to staff when collecting your parcel.
 
 Thank you.
 """
@@ -65,24 +69,66 @@ Thank you.
             qr_image.add_header("Content-Disposition", "attachment", filename="parcel_qr.png")
             msg.attach(qr_image)
 
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(SENDER_EMAIL, SENDER_PASSWORD)
-    server.send_message(msg)
-    server.quit()
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+    except Exception as e:
+        print("Failed to send QR email:", e)
+
 
 def send_reset_code_email(student_email, student_username, reset_code):
-        subject = "Password Reset Verification Code"
+    if not SENDER_EMAIL or not SENDER_PASSWORD:
+        print("Email not sent: SENDER_EMAIL or SENDER_PASSWORD missing")
+        return
+
+    subject = "Password Reset Verification Code"
+
+    body = f"""
+Hello {student_username},
+
+Your password reset verification code is: {reset_code}
+
+This code will expire in 10 minutes.
+
+Thank you.
+"""
+
+    msg = MIMEMultipart()
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = student_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+    except Exception as e:
+        print("Failed to send reset email:", e)
+
+
+def send_parcel_email(student_email, student_username, tracking_number):
+    def job():
+        if not SENDER_EMAIL or not SENDER_PASSWORD:
+            print("Email not sent: SENDER_EMAIL or SENDER_PASSWORD missing")
+            return
+
+        subject = "Parcel Arrival Notification"
 
         body = f"""
-    Hello {student_username},
+Hello {student_username},
 
-    Your password reset verification code is: {reset_code}
+Your parcel has arrived.
 
-    This code will expire in 10 minutes.
+Tracking Number: {tracking_number}
 
-    Thank you.
-    """
+Please login to the Smart Parcel Collection System and make payment to generate your QR code.
+
+Thank you.
+"""
 
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
@@ -90,11 +136,15 @@ def send_reset_code_email(student_email, student_username, reset_code):
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.send_message(msg)
-        server.quit()
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+                server.starttls()
+                server.login(SENDER_EMAIL, SENDER_PASSWORD)
+                server.send_message(msg)
+        except Exception as e:
+            print("Failed to send parcel email:", e)
+
+    threading.Thread(target=job, daemon=True).start()
 
 
 def init_db():
@@ -124,7 +174,7 @@ def init_db():
             payment_status TEXT DEFAULT 'Unpaid',
             collection_status TEXT DEFAULT 'Not Collected',
             qr_code TEXT,
-            collection_date DATETIME
+            collection_date TEXT
         )
     ''')
 
@@ -148,29 +198,50 @@ def init_db():
         )
     ''')
 
-    c.execute(""" 
+    c.execute('''
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sender_username TEXT,
             receiver_username TEXT,
             message TEXT,
+            answer TEXT,
+            status TEXT DEFAULT 'Pending',
             is_read INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            answered_at TEXT
         )
-    """)
+    ''')
+
+    try:
+        c.execute("ALTER TABLE parcels ADD COLUMN collection_date TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute("ALTER TABLE parcels ADD COLUMN qr_code TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN answer TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN status TEXT DEFAULT 'Pending'")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN answered_at TEXT")
+    except sqlite3.OperationalError:
+        pass
 
     c.execute("""
-        INSERT OR IGNORE INTO staff (username, password) 
+        INSERT OR IGNORE INTO staff (username, password)
         VALUES (?, ?)
     """, ("admin", generate_password_hash("admin123")))
 
-    conn=get_db_connection()
-
-    try:
-        conn.execute("ALTER TABLE parcels ADD COLUMN collection_date TEXT")
-    except:
-        pass
-    
     conn.commit()
     conn.close()
 
@@ -193,15 +264,19 @@ def register():
         conn = get_db_connection()
 
         try:
-            conn.execute(
-                "INSERT INTO students (username, student_id, full_name, email, phone, password) VALUES (?, ?, ?, ?, ?, ?)",
+            conn.execute("""
+                INSERT INTO students
                 (username, student_id, full_name, email, phone, password)
-            )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (username, student_id, full_name, email, phone, password))
+
             conn.commit()
             flash("Student registered! Please login.")
             return redirect(url_for('login'))
+
         except sqlite3.IntegrityError:
             flash("Username or ID already exists!")
+
         finally:
             conn.close()
 
@@ -215,10 +290,10 @@ def login():
         password = request.form['password']
 
         conn = get_db_connection()
-        student = conn.execute(
-            "SELECT * FROM students WHERE username=? AND password=?",
-            (username, password)
-        ).fetchone()
+        student = conn.execute("""
+            SELECT * FROM students
+            WHERE username=? AND password=?
+        """, (username, password)).fetchone()
         conn.close()
 
         if student:
@@ -232,8 +307,7 @@ def login():
 
 @app.route('/dashboard/<username>')
 def dashboard(username):
-    conn = sqlite3.connect('database.db', timeout=30)
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -243,12 +317,15 @@ def dashboard(username):
         AND DATETIME(collection_date, '+3 days') <= DATETIME('now')
     """)
     conn.commit()
-    conn.close()
 
     cursor.execute("SELECT * FROM students WHERE username = ?", (username,))
     user = cursor.fetchone()
 
-    cursor.execute("SELECT * FROM parcels WHERE student_username = ?", (username,))
+    cursor.execute("""
+        SELECT * FROM parcels
+        WHERE student_username = ?
+        ORDER BY id DESC
+    """, (username,))
     parcels = cursor.fetchall()
 
     conn.close()
@@ -262,6 +339,7 @@ def dashboard(username):
         profile_pic=user['profile_pic_path'] if user and 'profile_pic_path' in user.keys() else None
     )
 
+
 @app.route('/upload_profile/<username>', methods=['POST'])
 def upload_profile(username):
     if 'profile_pic' not in request.files:
@@ -274,21 +352,19 @@ def upload_profile(username):
 
     if file and allowed_file(file.filename):
         filename = secure_filename(f"{username}_{file.filename}")
-
         file.save(os.path.join(UPLOAD_FOLDER, filename))
-
         saved_path = "profile_pics/" + filename
 
         conn = get_db_connection()
-        conn.execute(
-            "UPDATE students SET profile_pic_path=? WHERE username=?",
-            (saved_path, username)
-        )
+        conn.execute("""
+            UPDATE students
+            SET profile_pic_path=?
+            WHERE username=?
+        """, (saved_path, username))
         conn.commit()
         conn.close()
 
     return redirect(url_for('dashboard', username=username))
-
 
 
 @app.route('/pay_selected/<username>', methods=['POST'])
@@ -304,10 +380,7 @@ def pay_selected(username):
     qr_files = []
 
     for parcel_id in selected_ids:
-        parcel = c.execute(
-            "SELECT * FROM parcels WHERE id=?",
-            (parcel_id,)
-        ).fetchone()
+        parcel = c.execute("SELECT * FROM parcels WHERE id=?", (parcel_id,)).fetchone()
 
         if not parcel:
             continue
@@ -322,15 +395,13 @@ def pay_selected(username):
         qr_img = qrcode.make(data)
         qr_img.save(qr_path)
 
-        c.execute(
-            """
+        c.execute("""
             UPDATE parcels
-            SET collection_status='Pending Confirmation',
-            collection_date= DATETIME('now'),
+            SET payment_status='Paid',
+                qr_code=?,
+                collection_status='Not Collected'
             WHERE id=?
-            """,
-            (parcel_id,)
-        )
+        """, (qr_filename, parcel_id))
 
         student = conn.execute(
             "SELECT email FROM students WHERE username=?",
@@ -354,7 +425,6 @@ def pay_selected(username):
     return render_template('payment_success.html', qr_codes=qr_files, username=username)
 
 
-
 @app.route('/staff/login', methods=['GET', 'POST'])
 def staff_login():
     if request.method == 'POST':
@@ -363,12 +433,12 @@ def staff_login():
 
         conn = get_db_connection()
         staff = conn.execute(
-            "SELECT * FROM staff WHERE username=? AND password=?",
-            (username, password)
+            "SELECT * FROM staff WHERE username=?",
+            (username,)
         ).fetchone()
         conn.close()
 
-        if staff:
+        if staff and check_password_hash(staff['password'], password):
             session['staff_username'] = username
             return redirect(url_for('staff_dashboard', username=username))
 
@@ -376,17 +446,24 @@ def staff_login():
 
     return render_template('staff_login.html')
 
--474
+
 @app.route('/staff/dashboard/<username>')
 def staff_dashboard(username):
     conn = get_db_connection()
-    parcels = conn.execute("SELECT * FROM parcels").fetchall()
-    chat_messages = conn.execute(
-        "SELECT * FROM chat_messages ORDER BY status='Pending' DESC, created_at DESC"
-    ).fetchall()
-    conn.close()
-    today = date.today()
 
+    parcels = conn.execute("""
+        SELECT * FROM parcels
+        ORDER BY id DESC
+    """).fetchall()
+
+    chat_messages = conn.execute("""
+        SELECT * FROM chat_messages
+        ORDER BY status='Pending' DESC, created_at DESC
+    """).fetchall()
+
+    conn.close()
+
+    today = date.today()
     parcel_list = []
 
     for parcel in parcels:
@@ -412,47 +489,13 @@ def staff_dashboard(username):
     )
 
 
-def send_parcel_email(student_email, student_username, tracking_number):
-    
-    def job():
-        subject = "Parcel Arrival Notification"
-        body = f"""
-        Hello {student_username},
-
-        Your parcel has arrived.
-
-        Tracking Number: {tracking_number}
-
-        Please login to the Smart Parcel Collection System and make payment to generate your QR code.
-
-        Thank you.
-        """
-
-        msg = MIMEMultipart()
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = student_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-
-        try:
-            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
-                server.starttls()
-                server.login(SENDER_EMAIL, SENDER_PASSWORD)
-                server.send_message(msg)
-            return True
-        except Exception as e:
-            print("Failed to send parcel email:", e)
-            return False
-
-    threading.Thread(target=job, daemon=True).start()
-
-@app.route('/staff/checkin', methods=['GET','POST'])
+@app.route('/staff/checkin', methods=['GET', 'POST'])
 def staff_checkin():
     if request.method == 'POST':
         student_username = request.form.get('student_username') or request.form.get('username')
         tracking_number = request.form.get('tracking_number')
         courier = request.form.get('courier')
-        quantity = request.form.get('quantity',1)
+        quantity = request.form.get('quantity', 1)
 
         conn = get_db_connection()
 
@@ -461,37 +504,33 @@ def staff_checkin():
             (student_username,)
         ).fetchone()
 
-        conn.execute(
-            """
-            INSERT INTO parcels 
+        conn.execute("""
+            INSERT INTO parcels
             (student_username, tracking_number, courier, arrival_date, quantity, payment_status, collection_status)
             VALUES (?, ?, ?, DATE('now'), ?, 'Unpaid', 'Not Collected')
-            """,
-            (student_username, tracking_number, courier, quantity)
-        )
+        """, (student_username, tracking_number, courier, quantity))
 
         conn.execute("""
-        INSERT INTO notices (title, message, type, recipient)
-        VALUES (?, ?, ?, ?)
-    """, (
-        "Parcel Arrived",
-        f"Your parcel with tracking number {tracking_number} has arrived. Please make payment to generate QR code.",
-        "notification",
-        student_username
-    ))
+            INSERT INTO notices (title, message, type, recipient)
+            VALUES (?, ?, ?, ?)
+        """, (
+            "Parcel Arrived",
+            f"Your parcel with tracking number {tracking_number} has arrived. Please make payment to generate QR code.",
+            "notification",
+            student_username
+        ))
 
         conn.commit()
         conn.close()
 
         if student and student['email']:
-            send_parcel_email(
-            student['email'],
-            student_username,
-            tracking_number
-        )
+            send_parcel_email(student['email'], student_username, tracking_number)
+
         flash("Parcel checked in and notification sent!")
         return redirect(url_for('staff_dashboard', username=session['staff_username']))
+
     return render_template('parcel_checkin.html')
+
 
 @app.route('/staff/qr_scan', methods=['GET', 'POST'])
 def staff_qr_scan():
@@ -509,60 +548,42 @@ def staff_qr_scan():
 
             conn = get_db_connection()
 
-            parcel_info = conn.execute(
-                "SELECT * FROM parcels WHERE id=?",
-                (parcel_id,)
-            ).fetchone()
+            parcel_info = conn.execute("""
+                SELECT * FROM parcels
+                WHERE id=?
+            """, (parcel_id,)).fetchone()
 
             if not parcel_info:
                 conn.close()
-                flash("Invalid QR.")
+                flash("Parcel not found.")
                 return render_template('staff_qr_scan.html', parcel_info=None)
 
-            conn.execute("""
-                UPDATE parcels
-                SET collection_status = 'Pending Confirmation',
-                    collection_date = DATETIME('now')
-                WHERE id = ?
-            """, (parcel_id,))
-
-            conn.commit()
             conn.close()
 
-            flash("QR scanned succesfully! Please confirm collection.")
+            flash("QR scanned successfully. Please check parcel information.")
 
             return render_template('staff_qr_scan.html', parcel_info=parcel_info)
 
     return render_template('staff_qr_scan.html', parcel_info=parcel_info)
 
+
 @app.route("/release_parcel/<int:parcel_id>", methods=["POST"])
 def release_parcel(parcel_id):
     conn = get_db_connection()
+
     conn.execute("""
         UPDATE parcels
-        SET status='Pending Confirmation',
+        SET collection_status='Pending Confirmation',
             collection_date = DATETIME('now')
         WHERE id = ?
     """, (parcel_id,))
+
     conn.commit()
     conn.close()
+
     flash("Parcel released. Waiting for student to confirm collection.")
     return redirect(url_for('staff_qr_scan'))
 
-@app.route("/scan_result/<tracking_number>")
-def scan_result(tracking_number):
-    conn = get_db_connection()
-    parcel = conn.execute(
-        "SELECT * FROM parcels WHERE tracking_number = ?",
-        (tracking_number,)
-    ).fetchone()
-    conn.close()
-
-    if not parcel:
-        flash("Parcel not found.")
-        return redirect(url_for('staff_qr_scan'))
-
-    return render_template('scan_result.html', parcel=parcel)
 
 @app.route("/confirm_collection/<int:parcel_id>", methods=["POST"])
 def confirm_collection(parcel_id):
@@ -571,8 +592,9 @@ def confirm_collection(parcel_id):
     if not username:
         flash("Please login first.")
         return redirect(url_for('login'))
-    
+
     conn = get_db_connection()
+
     conn.execute("""
         UPDATE parcels
         SET collection_status='Collected',
@@ -580,14 +602,14 @@ def confirm_collection(parcel_id):
         WHERE id=?
         AND student_username=?
     """, (parcel_id, username))
+
     conn.commit()
     conn.close()
+
     flash("Parcel collection confirmed!")
     return redirect(url_for('dashboard', username=username))
 
 
-
-# ---------------- Chatbox Routes ---------------- #
 @app.route('/chatbot/ask', methods=['POST'])
 def chatbot_ask():
     data = request.get_json(silent=True) or {}
@@ -612,14 +634,11 @@ def chatbot_ask():
     conn = get_db_connection()
 
     if tracking_number:
-        parcel = conn.execute(
-            """
+        parcel = conn.execute("""
             SELECT * FROM parcels
             WHERE tracking_number = ?
             AND (? IS NULL OR student_username = ?)
-            """,
-            (tracking_number, username, username)
-        ).fetchone()
+        """, (tracking_number, username, username)).fetchone()
         conn.close()
 
         if parcel:
@@ -639,7 +658,7 @@ def chatbot_ask():
 
             return jsonify({"reply": reply})
 
-            return jsonify({"reply": "I could not find that tracking number. Please check the number or choose Ask staff below."})
+        return jsonify({"reply": "I could not find that tracking number. Please check the number or choose Ask staff below."})
 
     if any(word in lower_message for word in ['track', 'tracking', 'where', 'status', 'parcel']):
         conn.close()
@@ -647,14 +666,14 @@ def chatbot_ask():
 
     if 'payment' in lower_message or 'pay' in lower_message:
         conn.close()
-        return jsonify({"reply": "To pay, tick your unpaid parcel in the student dashboard, choose a payment method, then click Proceed to Payment."})
+        return jsonify({"reply": "To pay, tick your unpaid parcel in your dashboard, then click Proceed to Payment."})
 
     if 'qr' in lower_message or 'collect' in lower_message or 'collection' in lower_message:
         conn.close()
         return jsonify({"reply": "After payment, your QR code appears in the dashboard. Show that QR code to staff during collection."})
 
     conn.close()
-    return jsonify({"reply": "I can help you track parcels, check payment status, and explain collection steps. For other questions, click Ask staff."})
+    return jsonify({"reply": "I can help you track parcels, check payment status, and explain collection steps."})
 
 
 @app.route('/chatbot/ask_staff', methods=['POST'])
@@ -667,14 +686,17 @@ def chatbot_ask_staff():
         return jsonify({"reply": "Please type your question before sending it to staff."}), 400
 
     conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO chat_messages (student_username, question) VALUES (?, ?)",
-        (username, question)
-    )
+
+    conn.execute("""
+        INSERT INTO chat_messages
+        (sender_username, receiver_username, message, status)
+        VALUES (?, ?, ?, 'Pending')
+    """, (username, 'staff', question))
+
     conn.commit()
     conn.close()
 
-    return jsonify({"reply": "Your question has been sent to staff. Please check this chat later for their answer."})
+    return jsonify({"reply": "Your question has been sent to staff."})
 
 
 @app.route('/chatbot/my_questions')
@@ -685,16 +707,15 @@ def chatbot_my_questions():
         return jsonify({"messages": []})
 
     conn = get_db_connection()
-    messages = conn.execute(
-        """
-        SELECT question, answer, status, created_at, answered_at
+
+    messages = conn.execute("""
+        SELECT message, answer, status, created_at, answered_at
         FROM chat_messages
-        WHERE student_username=?
+        WHERE sender_username=?
         ORDER BY created_at DESC
         LIMIT 10
-        """,
-        (username,)
-    ).fetchall()
+    """, (username,)).fetchall()
+
     conn.close()
 
     return jsonify({"messages": [dict(message) for message in messages]})
@@ -713,6 +734,7 @@ def staff_answer_chat(message_id):
         return redirect(url_for('staff_dashboard', username=session['staff_username']))
 
     conn = get_db_connection()
+
     conn.execute("""
         UPDATE chat_messages
         SET answer=?,
@@ -727,34 +749,38 @@ def staff_answer_chat(message_id):
     flash("Reply sent to student.")
     return redirect(url_for('staff_dashboard', username=session['staff_username']))
 
+
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-            email = request.form['email'].strip()
+        email = request.form['email'].strip()
 
-            conn = get_db_connection()
-            student = conn.execute(
-                "SELECT * FROM students WHERE email=?",
-                (email,)
-            ).fetchone()
-            conn.close()
+        conn = get_db_connection()
 
-            if not student:
-                flash("Email not found.")
-                return redirect('/forgot_password')
+        student = conn.execute(
+            "SELECT * FROM students WHERE email=?",
+            (email,)
+        ).fetchone()
 
-            reset_code = str(random.randint(1000, 9999))
+        conn.close()
 
-            session['reset_email'] = email
-            session['reset_code'] = reset_code
-            session['reset_code_expiry'] = (datetime.now() + timedelta(minutes=10)).isoformat()
+        if not student:
+            flash("Email not found.")
+            return redirect('/forgot_password')
 
-            send_reset_code_email(email, student['username'], reset_code)
+        reset_code = str(random.randint(1000, 9999))
 
-            flash("A 4-digit code has been sent to your email.")
-            return redirect('/verify_reset_code')
+        session['reset_email'] = email
+        session['reset_code'] = reset_code
+        session['reset_code_expiry'] = (datetime.now() + timedelta(minutes=10)).isoformat()
+
+        send_reset_code_email(email, student['username'], reset_code)
+
+        flash("A 4-digit code has been sent to your email.")
+        return redirect('/verify_reset_code')
 
     return render_template('forgot_password.html')
+
 
 @app.route('/verify_reset_code', methods=['GET', 'POST'])
 def verify_reset_code():
@@ -792,10 +818,13 @@ def reset_password():
             return redirect(url_for('reset_password'))
 
         conn = get_db_connection()
-        conn.execute(
-            "UPDATE students SET password=? WHERE email=?",
-            (new_password, session['reset_email'])
-        )
+
+        conn.execute("""
+            UPDATE students
+            SET password=?
+            WHERE email=?
+        """, (new_password, session['reset_email']))
+
         conn.commit()
         conn.close()
 
@@ -805,6 +834,7 @@ def reset_password():
         return redirect(url_for('login'))
 
     return render_template('reset_password.html')
+
 
 @app.route('/notices/<username>')
 def notices(username):
@@ -833,16 +863,20 @@ def add_notice():
     recipient = request.form.get('recipient', 'all')
 
     conn = get_db_connection()
+
     conn.execute("""
         INSERT INTO notices (title, message, type, recipient)
         VALUES (?, ?, ?, ?)
     """, (title, message, notice_type, recipient))
+
     conn.commit()
     conn.close()
 
     flash("Notice added successfully!")
     return redirect(url_for('staff_dashboard', username=session['staff_username']))
 
+
 init_db()
+
 if __name__ == "__main__":
     app.run(debug=True)
