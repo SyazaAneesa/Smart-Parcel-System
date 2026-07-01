@@ -124,7 +124,7 @@ def init_db():
             payment_status TEXT DEFAULT 'Unpaid',
             collection_status TEXT DEFAULT 'Not Collected',
             qr_code TEXT,
-            collection_time TIMESTAMP
+            collection_date DATETIME
         )
     ''')
 
@@ -240,8 +240,8 @@ def dashboard(username):
         UPDATE parcels
         SET collection_status = 'Collected'
         WHERE student_username = ? AND collection_status = 'Pending Confirmation'
-        AND DATETIME(collection_time, '+3 days') <= DATETIME('now')
-    """)
+        AND DATETIME(collection_date, '+3 days') <= DATETIME('now')
+    """, (username,))
     conn.commit()
 
     cursor.execute("SELECT * FROM students WHERE username = ?", (username,))
@@ -325,7 +325,7 @@ def pay_selected(username):
             """
             UPDATE parcels
             SET collection_status='Pending Confirmation',
-            collection_time=CURRENT_TIMESTAMP
+            collection_date= DATETIME('now'),
             WHERE id=?
             """,
             (parcel_id,)
