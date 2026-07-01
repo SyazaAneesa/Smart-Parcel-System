@@ -570,7 +570,7 @@ def staff_qr_scan():
 
             flash("QR scanned successfully. Please check parcel information.")
 
-            return render_template('staff_qr_scan.html', parcel_info=parcel_info)
+            return render_template('scan_result.html', tracking_number=parcel_info['tracking_number'], parcel_info=parcel_info)
 
     return render_template('staff_qr_scan.html', parcel_info=parcel_info)
 
